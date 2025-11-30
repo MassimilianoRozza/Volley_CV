@@ -1,0 +1,16 @@
+numpy
+opencv-python
+matplotlib
+pandas
+scipy
+torch
+torchvision
+torchaudio
+ultralytics
+mediapipe
+norfair
+filterpy
+scikit-learn
+tqdm
+jupyter
+notebook
