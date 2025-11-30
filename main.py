@@ -5,6 +5,21 @@ import numpy as np
 from src.court_detection import CourtDetector
 from src.calibration import CalibrationManager
 from src.radar import RadarView
+from src.tracker import PlayerTracker
+
+# Global context holder for trackbar to ensure scope for callback
+trackbar_context = {
+    'cap': None,
+    'total_frames': 0
+}
+
+def on_trackbar_change(frame_pos):
+    """
+    Callback function for the seek trackbar.
+    Sets the video position to the frame indicated by the trackbar.
+    """
+    if trackbar_context['cap'] is not None:
+        trackbar_context['cap'].set(cv2.CAP_PROP_POS_FRAMES, frame_pos)
 
 def ask_user_choice_cv(question_text, window_name="Confirmation"):
     """
@@ -139,7 +154,7 @@ def select_court_structure(frame):
     
     # Index 0: Perimeter (4 pts)
     # Index 1: Near 3m (2 pts)
-    # Index 2: Center/Net (2 pts)
+    # Index 2: Net (2 pts)
     # Index 3: Far 3m (2 pts)
     selections = [None, None, None, None]
     
@@ -218,6 +233,7 @@ def main():
 
     detector = CourtDetector()
     radar_view = RadarView()
+    tracker = PlayerTracker()
 
     # Check if input is image or video
     is_video = args.input.lower().endswith(('.mp4', '.avi', '.mov', '.mkv'))
@@ -263,13 +279,42 @@ def main():
         cv2.destroyAllWindows() # Ensure clean state
         window_name = "Volley_CV - Court Detection"
         radar_window = "Volley_CV - Radar View"
+
+        # Get video properties for trackbar
+        trackbar_context['cap'] = cap # Assign cap to global context
+        trackbar_context['total_frames'] = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        fps = cap.get(cv2.CAP_PROP_FPS)
+
+        cv2.namedWindow(window_name)
+        # Aggiungi un imshow "dummy" per assicurarti che la finestra sia renderizzata prima del trackbar
+        cv2.imshow(window_name, np.zeros((10, 10, 3), dtype=np.uint8)) 
+        cv2.waitKey(1) # Rendi la finestra visibile per un istante
+        # Create trackbar, mapping frames to current position
+        cv2.createTrackbar("Seek (frames)", window_name, 0, trackbar_context['total_frames'] - 1, on_trackbar_change)
         
         while True:
+            # Update trackbar position to current frame
+            current_frame_pos = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
+            cv2.setTrackbarPos("Seek (frames)", window_name, current_frame_pos)
+
             ret, frame = cap.read()
             if not ret:
                 break
 
+            # 1. Detect and Draw Court Lines (Base Layer)
             processed_frame = detector.process_frame(frame)
+            
+            # 2. Detect and Track Players
+            tracks = tracker.detect_and_track(frame)
+            processed_frame = tracker.draw_tracks(processed_frame, tracks)
+
+            # Display current time
+            current_seconds = current_frame_pos / fps
+            minutes = int(current_seconds // 60)
+            seconds = int(current_seconds % 60)
+            time_str = f"{minutes:02d}:{seconds:02d}"
+
+            cv2.putText(processed_frame, f"Time: {time_str}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
             cv2.putText(processed_frame, "Press 'q' to quit", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
             cv2.imshow(window_name, processed_frame)
             
@@ -277,10 +322,11 @@ def main():
             if detector.manual_points:
                 birdseye_frame = radar_view.get_warped_frame(frame, detector.manual_points)
                 if birdseye_frame is not None:
+                    birdseye_frame = radar_view.update_player_positions(birdseye_frame, tracks)
                     cv2.imshow(radar_window, birdseye_frame)
             
-            # Press 'q' to quit
-            if cv2.waitKey(1) & 0xFF == ord('q'):
+            key = cv2.waitKey(1) & 0xFF # Added a small delay to allow trackbar to update
+            if key == ord('q'):
                 break
             
             # Handle window close (X button)
@@ -317,6 +363,11 @@ def main():
             detector.set_manual_points(manual_points)
 
         processed_frame = detector.process_frame(frame)
+        
+        # Run detection on single image too
+        tracks = tracker.detect_and_track(frame)
+        processed_frame = tracker.draw_tracks(processed_frame, tracks)
+
         cv2.putText(processed_frame, "Press any key to exit", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
         cv2.imshow("Volley_CV - Court Detection", processed_frame)
         
@@ -324,6 +375,7 @@ def main():
         if detector.manual_points:
             birdseye_frame = radar_view.get_warped_frame(frame, detector.manual_points)
             if birdseye_frame is not None:
+                birdseye_frame = radar_view.update_player_positions(birdseye_frame, tracks)
                 cv2.imshow("Volley_CV - Radar View", birdseye_frame)
             
         cv2.waitKey(0)
