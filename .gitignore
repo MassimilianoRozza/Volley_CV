@@ -9996,3 +9996,5 @@ venv/lib/python3.12/site-packages/tinycss2-1.4.0.dist-info/LICENSE
 venv/lib/python3.12/site-packages/tinycss2-1.4.0.dist-info/METADATA
 venv/lib/python3.12/site-packages/tinycss2-1.4.0.dist-info/RECORD
 venv/lib/python3.12/site-packages/tinycss2-1.4.0.dist-info/WHEEL
+Video_test/*
+Video_test/**/*
