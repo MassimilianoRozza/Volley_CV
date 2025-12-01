@@ -10,13 +10,18 @@ Questo progetto mira a sviluppare un sistema di analisi video basato sulla Compu
 *   **Radar View (Bird's Eye View):** Generazione di una vista tattica dall'alto con proiezione su un campo sintetico (zona libera e area di gioco colorate).
 *   **Modificabilità:** Possibilità di rivedere e correggere la calibrazione prima dell'avvio.
 
+### Fase 2: Tracciamento Core (In Corso)
+*   **Tracciamento Giocatori (Player Tracking):** Utilizzo di YOLOv8 e DeepSORT per identificare e tracciare i giocatori nel tempo.
+*   **Filtraggio ROI (Region of Interest):** Possibilità di selezionare la "Zona Attiva" (Sinistra, Destra o Entrambi) per tracciare solo i giocatori in campo ed escludere panchine o spettatori.
+*   **Supporto Orientamento Video:** Supporta video ripresi sia da fondo campo ("Verticale") che lateralmente ("Orizzontale").
+*   **Radar View Interattiva:**
+    *   Generazione di una vista tattica 2D dall'alto.
+    *   **Correzione Live:** Pulsanti a schermo **"SWAP SIDES"** (Ruota 180°) e **"MIRROR LR"** (Specchia) per correggere la proiezione se i giocatori appaiono nella metà campo errata.
+
 ## Roadmap Futura
 
-### Fase 2: Tracciamento Core (Giocatori e Palla)
-*   **Tracciamento Giocatori (Player Tracking):** Object Detection (YOLO) e Tracking (DeepSORT/ByteTrack).
-*   **Tracciamento Palla (Ball Tracking):** Modelli specializzati (TrackNet) e Filtri di Kalman.
-
 ### Fase 3: Riconoscimento Azioni
+*   **Tracciamento Palla (Ball Tracking):** Modelli specializzati (TrackNet) e Filtri di Kalman.
 *   **Pose Estimation:** MediaPipe/OpenPose per lo scheletro dei giocatori.
 *   **Action Recognition:** Classificazione delle azioni (schiacciata, muro, bagher).
 
@@ -33,4 +38,6 @@ source venv/bin/activate
 python main.py --input percorso/al/video.mp4
 ```
 
-Segui le istruzioni a schermo per calibrare il campo. Se esiste già una calibrazione salvata, ti verrà chiesto se vuoi caricarla.
+1.  **Setup**: Segui le istruzioni a terminale per selezionare l'orientamento del video e la zona attiva di tracciamento.
+2.  **Calibrazione**: Se non presente, esegui la calibrazione cliccando i punti richiesti sul video.
+3.  **Analisi**: Durante la riproduzione, usa i pulsanti nella finestra "Radar" per correggere l'orientamento della mappa se necessario.

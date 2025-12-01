@@ -39,6 +39,40 @@ class CourtDetector:
                 cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
         return frame
 
+    def _order_points(self, pts):
+        """
+        Orders a list of 4 points in the order: [top-left, top-right, bottom-right, and bottom-left].
+        This is crucial for consistent perspective transform. (Duplicated from RadarView for independence)
+        """
+        pts = np.array(pts, dtype="float32")
+        
+        x_sorted = pts[np.argsort(pts[:, 0]), :]
+        left_most = x_sorted[:2, :]
+        right_most = x_sorted[2:, :]
+
+        left_most = left_most[np.argsort(left_most[:, 1]), :]
+        (tl, bl) = left_most
+
+        right_most = right_most[np.argsort(right_most[:, 1]), :]
+        (tr, br) = right_most
+
+        return np.array([tl, tr, br, bl], dtype="float32")
+
+    def draw_ordered_perimeter_points(self, img, manual_points):
+        """
+        Draws and labels the 4 ordered perimeter points on the image.
+        """
+        if manual_points and len(manual_points) >= 4:
+            src_raw_pts = np.array(manual_points[:4], dtype="float32")
+            ordered_pts = self._order_points(src_raw_pts)
+
+            labels = ["TL", "TR", "BR", "BL"]
+            for i, pt in enumerate(ordered_pts):
+                x, y = int(pt[0]), int(pt[1])
+                cv2.circle(img, (x, y), 8, (0, 255, 255), -1) # Yellow circle
+                cv2.putText(img, labels[i], (x + 10, y + 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        return img
+
     def draw_manual_court(self, frame):
         """
         Draws the manually selected court points and lines based on specific topology.

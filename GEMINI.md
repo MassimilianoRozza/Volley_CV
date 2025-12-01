@@ -2,12 +2,16 @@
 
 **Volley_CV** is a Computer Vision project designed to analyze volleyball games. It aims to provide detailed statistics, track players and the ball, and recognize game actions using machine learning and computer vision techniques.
 
+## TODO
+- [ ] Add advanced analytics and heatmaps (Phase 4).
+- [ ] Refine ball tracking accuracy.
+
 ## Project Overview
 
 The project is structured into four logical phases:
 
 1.  **Phase 1: Court Detection & Calibration:** Identifying court lines and mapping pixel coordinates to real-world 2D coordinates (Homography).
-2.  **Phase 2: Core Tracking:** Tracking players (using YOLO, DeepSORT) and the ball (using TrackNet/Kalman Filters).
+2.  **Phase 2: Core Tracking:** Tracking players (using YOLO, DeepSORT) and the ball (using TrackNet/Kalman Filters). **(In Progress)**
 3.  **Phase 3: Action Recognition:** Identifying game actions (spikes, blocks, sets) using Pose Estimation (MediaPipe/OpenPose) and temporal analysis.
 4.  **Phase 4: Advanced Analytics:** Generating heatmaps, performance metrics, and statistical reports.
 
@@ -17,7 +21,7 @@ The project is structured into four logical phases:
 *   **Computer Vision:** OpenCV, NumPy
 *   **Deep Learning:** PyTorch, TorchVision, Ultralytics (YOLO)
 *   **Pose Estimation:** MediaPipe
-*   **Tracking:** Norfair, FilterPy (Kalman Filters)
+*   **Tracking:** DeepSORT, FilterPy (Kalman Filters)
 *   **Data Analysis:** Pandas, SciPy, Scikit-learn
 *   **Visualization:** Matplotlib, Jupyter Notebooks
 
@@ -29,7 +33,8 @@ Volley_CV/
 │   ├── __init__.py
 │   ├── court_detection.py  # Manual selection and line drawing
 │   ├── calibration.py      # Persistence logic (Load/Save JSON)
-│   └── radar.py            # Homography and Radar View generation
+│   ├── radar.py            # Homography, Radar View, and Interactive UI
+│   ├── tracker.py          # Player tracking (YOLO + DeepSORT) & ROI filtering
 ├── venv/                   # Python Virtual Environment
 ├── .gitignore
 ├── GEMINI.md               # This context file
@@ -43,7 +48,7 @@ Volley_CV/
 ### Prerequisites
 
 *   Python 3.x installed.
-*   (Optional) CUDA-compatible GPU for faster inference in later phases.
+*   (Optional) CUDA-compatible GPU for faster inference.
 
 ### Installation
 
@@ -71,21 +76,22 @@ The project is executed via `main.py`. You need to provide an input video or ima
 python main.py --input <path_to_video_or_image>
 ```
 
-**Example:**
-
-```bash
-python main.py --input Video_test/AVV_U12M__PROMOVOLLEY/MVI_0001.MP4
-```
-
 ## Development Conventions
 
 *   **Code Style:** Follow standard Python PEP 8 guidelines.
 *   **Modularity:** Core logic resides in `src/`, kept separate from the execution script `main.py`.
 *   **Environment:** Always use the virtual environment (`venv`) to manage dependencies.
 
-## Current Status (Phase 1 - Completed)
+## Current Status
 
-*   **Court Detection:** Moved to a manual calibration approach due to reliability issues with automatic detection on varying video qualities.
-*   **Calibration Flow:** Implemented a robust 4-phase manual selection process (Perimeter, Near 3m, Net, Far 3m) with visual feedback and editing capabilities.
-*   **Persistence:** Calibration data is saved to JSON files (e.g., `video.mp4.json`) and automatically loaded upon reuse.
-*   **Radar View:** A "Bird's Eye View" window shows the rectified court (using Homography) on a synthetic blue/orange background, ready for future player projection.
+*   **Court Detection:** Manual calibration with visual "Radar Guide" to assist in point selection order.
+*   **Calibration Flow:** Robust 4-phase selection (Perimeter, Near 3m, Net, Far 3m) with persistence (save/load JSON).
+*   **Radar View:**
+    *   Top-down "Bird's Eye View" of the court.
+    *   **Interactive Controls:**
+        *   `SWAP SIDES`: Rotates player positions 180 degrees (useful if camera is on the opposite side).
+        *   `MIRROR LR`: Flips player positions horizontally.
+*   **Player Tracking (Phase 2):**
+    *   **YOLOv8 + DeepSORT:** Integrated for real-time player detection and tracking.
+    *   **ROI Filtering:** Automatically excludes detections outside the active playing area (e.g., spectators) based on the calibration.
+    *   **Orientation Support:** Supports "Vertical" (baseline view) and "Horizontal" (sideline view) video inputs.

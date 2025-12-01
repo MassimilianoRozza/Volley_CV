@@ -21,6 +21,15 @@ def on_trackbar_change(frame_pos):
     if trackbar_context['cap'] is not None:
         trackbar_context['cap'].set(cv2.CAP_PROP_POS_FRAMES, frame_pos)
 
+def radar_mouse_callback(event, x, y, flags, param):
+    """
+    Handles mouse events for the Radar View window.
+    param: The RadarView instance.
+    """
+    if event == cv2.EVENT_LBUTTONDOWN:
+        radar_view = param
+        radar_view.check_button_click(x, y)
+
 def ask_user_choice_cv(question_text, window_name="Confirmation"):
     """
     Displays a question in an OpenCV window and waits for 'y' or 'n' input.
@@ -60,6 +69,99 @@ def ask_user_choice_cv(question_text, window_name="Confirmation"):
         except:
             return False # Window already destroyed or error
 
+def ask_video_orientation():
+    """
+    Asks the user for the video orientation relative to the court.
+    Returns: 'vertical' or 'horizontal'.
+    """
+    window_name = "Orientation Mode"
+    cv2.namedWindow(window_name)
+    
+    img_height, img_width = 300, 600
+    img = np.zeros((img_height, img_width, 3), dtype=np.uint8)
+    
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 0.7
+    color = (255, 255, 255)
+    thickness = 2
+    
+    cv2.putText(img, "VIDEO ORIENTATION / ORIENTAMENTO", (20, 50), font, font_scale, (0, 255, 255), thickness)
+    cv2.putText(img, "1. Behind Baseline / Fondo Campo (Vertical)", (20, 100), font, 0.6, color, thickness)
+    cv2.putText(img, "2. Sideline / Laterale (Horizontal)", (20, 150), font, 0.6, color, thickness)
+    cv2.putText(img, "Press 1 or 2", (20, 220), font, 0.6, (200, 200, 200), 1)
+
+    cv2.imshow(window_name, img)
+    
+    orientation = 'vertical' # Default
+    
+    while True:
+        key = cv2.waitKey(10) & 0xFF
+        
+        if key == ord('1'):
+            orientation = 'vertical'
+            break
+        elif key == ord('2'):
+            orientation = 'horizontal'
+            break
+            
+        try:
+            if cv2.getWindowProperty(window_name, cv2.WND_PROP_VISIBLE) < 1:
+                break
+        except:
+            break
+            
+    cv2.destroyWindow(window_name)
+    return orientation
+
+def ask_court_side_selection():
+    """
+    Asks the user which part of the court to track.
+    Returns: 'all', 'left', or 'right'.
+    """
+    window_name = "Tracking Mode"
+    cv2.namedWindow(window_name)
+    
+    img_height, img_width = 300, 600
+    img = np.zeros((img_height, img_width, 3), dtype=np.uint8)
+    
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 0.7
+    color = (255, 255, 255)
+    thickness = 2
+    
+    cv2.putText(img, "SELECT TRACKING ZONE / SELEZIONE ZONA", (20, 50), font, font_scale, (0, 255, 255), thickness)
+    cv2.putText(img, "1. Both Halves / Entrambe le meta'", (20, 100), font, font_scale, color, thickness)
+    cv2.putText(img, "2. Left Half / Meta' Sinistra", (20, 150), font, font_scale, color, thickness)
+    cv2.putText(img, "3. Right Half / Meta' Destra", (20, 200), font, font_scale, color, thickness)
+    cv2.putText(img, "Press 1, 2, or 3", (20, 260), font, 0.6, (200, 200, 200), 1)
+
+    cv2.imshow(window_name, img)
+    
+    selected_zone = 'all' # Default
+    
+    while True:
+        key = cv2.waitKey(10) & 0xFF
+        
+        if key == ord('1'):
+            selected_zone = 'all'
+            break
+        elif key == ord('2'):
+            selected_zone = 'left'
+            break
+        elif key == ord('3'):
+            selected_zone = 'right'
+            break
+            
+        # Handle window close (default to all)
+        try:
+            if cv2.getWindowProperty(window_name, cv2.WND_PROP_VISIBLE) < 1:
+                break
+        except:
+            break
+            
+    cv2.destroyWindow(window_name)
+    return selected_zone
+
 def draw_existing_selections(img, selections):
     """
     Draws the parts of the court that are currently defined in 'selections'.
@@ -85,11 +187,12 @@ def draw_existing_selections(img, selections):
             for pt in selections[i]:
                 cv2.circle(img, pt, 5, (200, 200, 200), -1)
 
-def get_points_for_phase(base_frame, num_points, instruction_text, window_name, context_selections):
+def get_points_for_phase(base_frame, num_points, instruction_text, window_name, context_selections, radar_view=None, phase_idx=0):
     """
     Helper function to select a specific number of points for a phase.
     """
     current_points = [] # Points selected in this phase
+    guide_window = "Radar Guide"
     
     def mouse_callback(event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN:
@@ -129,23 +232,45 @@ def get_points_for_phase(base_frame, num_points, instruction_text, window_name, 
 
         cv2.imshow(window_name, display_frame)
 
+        # Show Radar Guide
+        if radar_view:
+            # Determine which point index we are waiting for
+            # If we have 0 points, we want index 0. If we have 1, we want index 1.
+            # If we have all points, maybe stop showing guide or show completed?
+            target_idx = len(current_points)
+            if target_idx < num_points:
+                guide_img = radar_view.get_radar_guide(phase_idx, target_idx)
+                cv2.imshow(guide_window, guide_img)
+            else:
+                # Optional: Show something else or keep last point?
+                # For now, let's just show the static court without marker or close it
+                # Showing static court is better context
+                guide_img = radar_view._draw_static_court()
+                cv2.imshow(guide_window, guide_img)
+
         key = cv2.waitKey(10) & 0xFF
 
         if key == ord('c') and len(current_points) == num_points:
+            if radar_view:
+                cv2.destroyWindow(guide_window)
             return current_points # Success
         
         if key == ord('r'):
             current_points = []
             
         if key == ord('q'):
+            if radar_view:
+                cv2.destroyWindow(guide_window)
             return None # User cancelled
         
         try:
             if cv2.getWindowProperty(window_name, cv2.WND_PROP_VISIBLE) < 1:
+                if radar_view:
+                    cv2.destroyWindow(guide_window)
                 return None
         except: pass
 
-def select_court_structure(frame):
+def select_court_structure(frame, radar_view=None):
     """
     Orchestrates the multi-phase court selection process with edit capability.
     """
@@ -168,7 +293,7 @@ def select_court_structure(frame):
     # Initial Filling Loop
     for i in range(4):
         if selections[i] is None:
-            pts = get_points_for_phase(frame, phase_info[i]["pts"], phase_info[i]["msg"], window_name, selections)
+            pts = get_points_for_phase(frame, phase_info[i]["pts"], phase_info[i]["msg"], window_name, selections, radar_view, i)
             if pts is None: 
                 cv2.destroyWindow(window_name)
                 return None
@@ -199,7 +324,7 @@ def select_court_structure(frame):
             old_selection = selections[idx]
             selections[idx] = None 
             
-            new_pts = get_points_for_phase(frame, phase_info[idx]["pts"], f"EDITING: {phase_info[idx]['msg']}", window_name, selections)
+            new_pts = get_points_for_phase(frame, phase_info[idx]["pts"], f"EDITING: {phase_info[idx]['msg']}", window_name, selections, radar_view, idx)
             
             if new_pts is not None:
                 selections[idx] = new_pts
@@ -261,7 +386,7 @@ def main():
         if manual_points is None:
             ret, first_frame = cap.read()
             if ret:
-                manual_points = select_court_structure(first_frame)
+                manual_points = select_court_structure(first_frame, radar_view)
                 
                 if manual_points:
                     # Save the newly selected points
@@ -275,6 +400,20 @@ def main():
         # 3. Set points to detector
         if manual_points:
             detector.set_manual_points(manual_points)
+            
+            # Ask orientation first
+            orientation = ask_video_orientation()
+            radar_view.set_orientation(orientation)
+
+            # Calculate homography immediately to enable filtering
+            radar_view.update_homography(manual_points)
+            
+            # Ask user for tracking zone preference
+            selected_zone = ask_court_side_selection()
+            radar_view.set_active_zone(selected_zone)
+            
+            # Set the ROI filter for the tracker
+            tracker.set_roi_filter(radar_view.is_in_bounds)
 
         cv2.destroyAllWindows() # Ensure clean state
         window_name = "Volley_CV - Court Detection"
@@ -286,6 +425,9 @@ def main():
         fps = cap.get(cv2.CAP_PROP_FPS)
 
         cv2.namedWindow(window_name)
+        cv2.namedWindow(radar_window)
+        cv2.setMouseCallback(radar_window, radar_mouse_callback, radar_view)
+
         # Aggiungi un imshow "dummy" per assicurarti che la finestra sia renderizzata prima del trackbar
         cv2.imshow(window_name, np.zeros((10, 10, 3), dtype=np.uint8)) 
         cv2.waitKey(1) # Rendi la finestra visibile per un istante
@@ -304,6 +446,10 @@ def main():
             # 1. Detect and Draw Court Lines (Base Layer)
             processed_frame = detector.process_frame(frame)
             
+            # Draw ordered perimeter points on the main video for debug
+            if detector.manual_points:
+                processed_frame = detector.draw_ordered_perimeter_points(processed_frame, detector.manual_points)
+            
             # 2. Detect and Track Players
             tracks = tracker.detect_and_track(frame)
             processed_frame = tracker.draw_tracks(processed_frame, tracks)
@@ -319,6 +465,10 @@ def main():
             cv2.imshow(window_name, processed_frame)
             
             # Radar / Birds-eye View
+            # DEBUG: Check homography matrix and manual points
+            # print(f"Main Loop Debug: radar_view.M is None: {radar_view.M is None}")
+            # print(f"Main Loop Debug: detector.manual_points is None: {detector.manual_points is None}")
+
             if detector.manual_points:
                 birdseye_frame = radar_view.get_warped_frame(frame, detector.manual_points)
                 if birdseye_frame is not None:
@@ -355,12 +505,26 @@ def main():
                  manual_points = saved_points
         
         if manual_points is None:
-             manual_points = select_court_structure(frame)
+             manual_points = select_court_structure(frame, radar_view)
              if manual_points:
                  CalibrationManager.save_calibration(args.input, manual_points)
 
         if manual_points:
             detector.set_manual_points(manual_points)
+            
+            # Ask orientation first
+            orientation = ask_video_orientation()
+            radar_view.set_orientation(orientation)
+            
+            # Calculate homography immediately to enable filtering
+            radar_view.update_homography(manual_points)
+
+            # Ask user for tracking zone preference
+            selected_zone = ask_court_side_selection()
+            radar_view.set_active_zone(selected_zone)
+            
+            # Set the ROI filter for the tracker
+            tracker.set_roi_filter(radar_view.is_in_bounds)
 
         processed_frame = detector.process_frame(frame)
         
@@ -371,7 +535,13 @@ def main():
         cv2.putText(processed_frame, "Press any key to exit", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
         cv2.imshow("Volley_CV - Court Detection", processed_frame)
         
+        cv2.namedWindow("Volley_CV - Radar View")
+        cv2.setMouseCallback("Volley_CV - Radar View", radar_mouse_callback, radar_view)
+
         # Also show radar view for image
+        # DEBUG: Check homography matrix and manual points for image
+        # print(f"Image Debug: radar_view.M is None: {radar_view.M is None}")
+        # print(f"Image Debug: detector.manual_points is None: {detector.manual_points is None}")
         if detector.manual_points:
             birdseye_frame = radar_view.get_warped_frame(frame, detector.manual_points)
             if birdseye_frame is not None:
