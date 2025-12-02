@@ -14,4 +14,4 @@ scikit-learn
 tqdm
 jupyter
 notebook
-deep-sort-realtime
+lapx

@@ -40,6 +40,9 @@ class RadarView:
         self.mirror_lr = False
         # Mirror Button rect: x, y, w, h
         self.mirror_button_rect = (140, 10, 120, 30)
+        
+        # Cache for static court image
+        self.static_court_img = None
 
     def set_active_zone(self, zone):
         """
@@ -47,7 +50,6 @@ class RadarView:
         zone: 'all', 'left', 'right'
         """
         self.active_zone = zone
-        print(f"RadarView: Active zone set to '{self.active_zone}'")
 
     def set_orientation(self, orientation):
         """
@@ -55,7 +57,6 @@ class RadarView:
         orientation: 'vertical' or 'horizontal'
         """
         self.orientation = orientation
-        print(f"RadarView: Orientation set to '{self.orientation}'")
         
     def draw_buttons(self, img):
         """
@@ -86,14 +87,12 @@ class RadarView:
         bx, by, bw, bh = self.button_rect
         if bx <= x <= bx + bw and by <= y <= by + bh:
             self.invert_sides = not self.invert_sides
-            print(f"RadarView: Invert sides toggled to {self.invert_sides}")
             return True
             
         # Check Mirror LR
         mx, my, mw, mh = self.mirror_button_rect
         if mx <= x <= mx + mw and my <= y <= my + mh:
             self.mirror_lr = not self.mirror_lr
-            print(f"RadarView: Mirror LR toggled to {self.mirror_lr}")
             return True
             
         return False
@@ -129,7 +128,11 @@ class RadarView:
     def _draw_static_court(self):
         """
         Helper to draw the static background and lines of the radar view.
+        Uses caching to avoid redrawing every frame.
         """
+        if self.static_court_img is not None:
+            return self.static_court_img.copy()
+
         # 1. Create Synthetic Background
         # Create blank image (Blue background for Free Zone)
         # Color is BGR: (255, 144, 30) -> Blue-ish
@@ -145,7 +148,9 @@ class RadarView:
         
         # Draw Overlay Lines
         radar_img = self.draw_court_overlay(radar_img)
-        return radar_img
+        
+        self.static_court_img = radar_img
+        return radar_img.copy()
 
     def update_homography(self, points):
         """
@@ -376,9 +381,7 @@ class RadarView:
         """
         Projects tracked players onto the radar view using the homography matrix.
         """
-        print(f"RadarView: update_player_positions called with {len(tracks)} tracks.") # DEBUG
         if self.M is None:
-            print("RadarView: Homography matrix (self.M) is None. Cannot project players.") # DEBUG
             return radar_img
 
         # Prepare points for transformation
@@ -399,8 +402,6 @@ class RadarView:
             
             points_to_transform.append([feet_x, feet_y])
             track_ids.append(track.track_id)
-
-        print(f"RadarView: {len(points_to_transform)} confirmed player feet positions for projection.") # DEBUG
 
         if not points_to_transform:
             # Even if no players, draw the buttons
@@ -427,9 +428,6 @@ class RadarView:
                 x = self.img_width - x
             
             tid = track_ids[i]
-            
-            # DEBUG: Print projected coordinates and check bounds
-            # print(f"RadarView: Player {tid} projected to ({x}, {y}). Radar dimensions: {self.img_width}x{self.img_height}")
             
             # Draw player ONLY if projected coordinates are within radar image bounds
             if (0 <= x < self.img_width and 0 <= y < self.img_height):

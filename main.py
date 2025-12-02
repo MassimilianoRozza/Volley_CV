@@ -371,14 +371,17 @@ def main():
 
         # Manual Calibration Step
         manual_points = None
+        loaded_settings = None
         
         # 1. Try to load existing calibration
-        saved_points = CalibrationManager.load_calibration(args.input)
+        saved_points, saved_settings = CalibrationManager.load_calibration(args.input)
+        
         if saved_points:
             print("Found existing calibration data.")
             use_saved = ask_user_choice_cv("Use saved calibration?", window_name="Load Calibration")
             if use_saved:
                 manual_points = saved_points
+                loaded_settings = saved_settings
             else:
                 print("Starting manual calibration...")
 
@@ -389,28 +392,50 @@ def main():
                 manual_points = select_court_structure(first_frame, radar_view)
                 
                 if manual_points:
-                    # Save the newly selected points
-                    CalibrationManager.save_calibration(args.input, manual_points)
+                    # We don't save here immediately anymore, wait until settings are defined
+                    pass
                 else:
                     print("Manual selection cancelled or skipped.")
                 
                 # Rewind video to start
                 cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
         
-        # 3. Set points to detector
+        # 3. Set points to detector and Configure Settings
         if manual_points:
             detector.set_manual_points(manual_points)
             
-            # Ask orientation first
-            orientation = ask_video_orientation()
-            radar_view.set_orientation(orientation)
-
-            # Calculate homography immediately to enable filtering
+            # Calculate homography immediately
             radar_view.update_homography(manual_points)
+
+            # Configure Orientation and Zone
+            orientation = 'vertical'
+            selected_zone = 'all'
             
-            # Ask user for tracking zone preference
-            selected_zone = ask_court_side_selection()
-            radar_view.set_active_zone(selected_zone)
+            settings_applied = False
+            if loaded_settings:
+                 use_settings = ask_user_choice_cv("Use saved settings (Orientation/Zone)?", window_name="Load Settings")
+                 if use_settings:
+                     orientation = loaded_settings.get("orientation", "vertical")
+                     selected_zone = loaded_settings.get("zone", "all")
+                     radar_view.set_orientation(orientation)
+                     radar_view.set_active_zone(selected_zone)
+                     settings_applied = True
+            
+            if not settings_applied:
+                # Ask orientation
+                orientation = ask_video_orientation()
+                radar_view.set_orientation(orientation)
+                
+                # Ask user for tracking zone preference
+                selected_zone = ask_court_side_selection()
+                radar_view.set_active_zone(selected_zone)
+            
+            # Save/Update Calibration with settings
+            current_settings = {
+                "orientation": radar_view.orientation,
+                "zone": radar_view.active_zone
+            }
+            CalibrationManager.save_calibration(args.input, manual_points, current_settings)
             
             # Set the ROI filter for the tracker
             tracker.set_roi_filter(radar_view.is_in_bounds)
@@ -465,9 +490,6 @@ def main():
             cv2.imshow(window_name, processed_frame)
             
             # Radar / Birds-eye View
-            # DEBUG: Check homography matrix and manual points
-            # print(f"Main Loop Debug: radar_view.M is None: {radar_view.M is None}")
-            # print(f"Main Loop Debug: detector.manual_points is None: {detector.manual_points is None}")
 
             if detector.manual_points:
                 birdseye_frame = radar_view.get_warped_frame(frame, detector.manual_points)
@@ -495,33 +517,52 @@ def main():
             sys.exit(1)
             
         # Load calibration for image if exists
-        saved_points = CalibrationManager.load_calibration(args.input)
+        saved_points, saved_settings = CalibrationManager.load_calibration(args.input)
         manual_points = None
+        loaded_settings = None
         
         if saved_points:
              print("Found existing calibration data.")
              use_saved = ask_user_choice_cv("Use saved calibration?", window_name="Load Calibration")
              if use_saved:
                  manual_points = saved_points
+                 loaded_settings = saved_settings
         
         if manual_points is None:
              manual_points = select_court_structure(frame, radar_view)
-             if manual_points:
-                 CalibrationManager.save_calibration(args.input, manual_points)
 
         if manual_points:
             detector.set_manual_points(manual_points)
             
-            # Ask orientation first
-            orientation = ask_video_orientation()
-            radar_view.set_orientation(orientation)
-            
-            # Calculate homography immediately to enable filtering
+            # Calculate homography immediately
             radar_view.update_homography(manual_points)
-
-            # Ask user for tracking zone preference
-            selected_zone = ask_court_side_selection()
-            radar_view.set_active_zone(selected_zone)
+            
+            # Configure Orientation and Zone
+            settings_applied = False
+            if loaded_settings:
+                 use_settings = ask_user_choice_cv("Use saved settings (Orientation/Zone)?", window_name="Load Settings")
+                 if use_settings:
+                     orientation = loaded_settings.get("orientation", "vertical")
+                     selected_zone = loaded_settings.get("zone", "all")
+                     radar_view.set_orientation(orientation)
+                     radar_view.set_active_zone(selected_zone)
+                     settings_applied = True
+            
+            if not settings_applied:
+                # Ask orientation first
+                orientation = ask_video_orientation()
+                radar_view.set_orientation(orientation)
+                
+                # Ask user for tracking zone preference
+                selected_zone = ask_court_side_selection()
+                radar_view.set_active_zone(selected_zone)
+            
+            # Save settings
+            current_settings = {
+                "orientation": radar_view.orientation,
+                "zone": radar_view.active_zone
+            }
+            CalibrationManager.save_calibration(args.input, manual_points, current_settings)
             
             # Set the ROI filter for the tracker
             tracker.set_roi_filter(radar_view.is_in_bounds)
@@ -539,9 +580,6 @@ def main():
         cv2.setMouseCallback("Volley_CV - Radar View", radar_mouse_callback, radar_view)
 
         # Also show radar view for image
-        # DEBUG: Check homography matrix and manual points for image
-        # print(f"Image Debug: radar_view.M is None: {radar_view.M is None}")
-        # print(f"Image Debug: detector.manual_points is None: {detector.manual_points is None}")
         if detector.manual_points:
             birdseye_frame = radar_view.get_warped_frame(frame, detector.manual_points)
             if birdseye_frame is not None:

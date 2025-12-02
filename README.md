@@ -20,14 +20,14 @@ Questo progetto mira a sviluppare un sistema di analisi video basato sulla Compu
 
 ## Roadmap Futura
 
-### Fase 3: Riconoscimento Azioni
+### Fase 3: Statistiche
+*   **Heatmap:** Mappe di calore delle posizioni.
+*   **Report:** Statistiche avanzate.
+
+### Fase 4: Idee per sviluppi futuri
 *   **Tracciamento Palla (Ball Tracking):** Modelli specializzati (TrackNet) e Filtri di Kalman.
 *   **Pose Estimation:** MediaPipe/OpenPose per lo scheletro dei giocatori.
 *   **Action Recognition:** Classificazione delle azioni (schiacciata, muro, bagher).
-
-### Fase 4: Statistiche
-*   **Heatmap:** Mappe di calore delle posizioni.
-*   **Report:** Statistiche avanzate.
 
 ---
 
